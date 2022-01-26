@@ -1,8 +1,8 @@
 package ru.javaops.masterjava.matrix;
 
+import java.util.ArrayList;
 import java.util.Random;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.*;
 
 /**
  * gkislin
@@ -14,7 +14,52 @@ public class MatrixUtil {
     public static int[][] concurrentMultiply(int[][] matrixA, int[][] matrixB, ExecutorService executor) throws InterruptedException, ExecutionException {
         final int matrixSize = matrixA.length;
         final int[][] matrixC = new int[matrixSize][matrixSize];
+        int thatColumn[] = new int[matrixSize];
 
+        class ColumnsMatrixC {
+            private Integer columnNumber;
+            private int[] column;
+
+            public ColumnsMatrixC(int columnNumber, int[] column) {
+                this.columnNumber = columnNumber;
+                this.column = column;
+            }
+
+            public int getColumnNumber() {
+                return columnNumber;
+            }
+
+            public int[] getColumn() {
+                return column;
+            }
+        }
+        CompletionService<ColumnsMatrixC> completionService = new ExecutorCompletionService<>(executor);
+        ArrayList<Future<ColumnsMatrixC>> futures = new ArrayList<>();
+        for (int j = 0; j < matrixSize; j++) {
+            final int finalJ = j;
+            futures.add(completionService.submit(() -> {
+                for (int k = 0; k < matrixSize; k++) {
+                    thatColumn[k] = matrixB[k][finalJ];
+                }
+                final int[] row = new int[matrixSize];
+                for (int i = 0; i < matrixSize; i++) {
+                    final int thisRow[] = matrixA[i];
+                    int summand = 0;
+                    for (int k = 0; k < matrixSize; k++) {
+                        summand += thisRow[k] * thatColumn[k];
+                    }
+                    row[i] = summand;
+                }
+                return new ColumnsMatrixC(finalJ, row);
+            }));
+        }
+        while (!futures.isEmpty()) {
+            Future<ColumnsMatrixC> future = completionService.take();
+            for (int i = 0; i < matrixSize; i++) {
+                matrixC[i][future.get().getColumnNumber()] = future.get().getColumn()[i];
+            }
+            futures.remove(future);
+        }
         return matrixC;
     }
 
