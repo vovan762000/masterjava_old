@@ -34,13 +34,12 @@ public class MatrixUtil {
             }
         }
         CompletionService<ColumnsMatrixC> completionService = new ExecutorCompletionService<>(executor);
-        ArrayList<Future<ColumnsMatrixC>> futures = new ArrayList<>();
         for (int j = 0; j < matrixSize; j++) {
             final int finalJ = j;
-            futures.add(completionService.submit(() -> {
-                for (int k = 0; k < matrixSize; k++) {
-                    thatColumn[k] = matrixB[k][finalJ];
-                }
+            for (int k = 0; k < matrixSize; k++) {
+                thatColumn[k] = matrixB[k][finalJ];
+            }
+            completionService.submit(() -> {
                 final int[] row = new int[matrixSize];
                 for (int i = 0; i < matrixSize; i++) {
                     final int thisRow[] = matrixA[i];
@@ -51,14 +50,13 @@ public class MatrixUtil {
                     row[i] = summand;
                 }
                 return new ColumnsMatrixC(finalJ, row);
-            }));
+            });
         }
-        while (!futures.isEmpty()) {
-            Future<ColumnsMatrixC> future = completionService.take();
+        for (int j = 0; j < matrixSize; j++) {
+            ColumnsMatrixC columnsMatrixC = completionService.take().get();
             for (int i = 0; i < matrixSize; i++) {
-                matrixC[i][future.get().getColumnNumber()] = future.get().getColumn()[i];
+                matrixC[i][columnsMatrixC.getColumnNumber()] = columnsMatrixC.getColumn()[i];
             }
-            futures.remove(future);
         }
         return matrixC;
     }
